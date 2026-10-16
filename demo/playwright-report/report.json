@@ -1,0 +1,76 @@
+{
+  "stats": {
+    "total": 3,
+    "passed": 1,
+    "failed": 1,
+    "skipped": 0,
+    "expected": 0,
+    "unexpected": 1,
+    "flaky": 1,
+    "ok": true
+  },
+  "suites": [
+    {
+      "title": "E2E Tests",
+      "specs": [
+        {
+          "title": "user can login with valid credentials",
+          "tests": [
+            {
+              "status": "passed",
+              "results": [
+                {
+                  "status": "passed",
+                  "duration": 3200,
+                  "startTime": "2026-10-16T10:00:00.000Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "contact form submits successfully",
+          "tests": [
+            {
+              "status": "failed",
+              "results": [
+                {
+                  "status": "failed",
+                  "duration": 8500,
+                  "startTime": "2026-10-16T10:00:05.000Z",
+                  "error": {
+                    "message": "Error: Timed out 5000ms waiting for expect(locator).toBeVisible()\n\nLocator: getByTestId(\"success-toast\")\nExpected: visible\nReceived: <element not found>"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "member upgrades to Pro plan",
+          "tests": [
+            {
+              "status": "passed",
+              "results": [
+                {
+                  "status": "failed",
+                  "duration": 5000,
+                  "startTime": "2026-10-16T10:00:15.000Z",
+                  "error": {
+                    "message": "Element not clickable"
+                  }
+                },
+                {
+                  "status": "passed",
+                  "duration": 4100,
+                  "startTime": "2026-10-16T10:00:20.000Z"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "suites": []
+    }
+  ]
+}

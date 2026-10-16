@@ -1,0 +1,9 @@
+{
+  "name": "pwr",
+  "version": "1.0.0",
+  "description": "Generate self-contained HTML reports from Playwright test results",
+  "scripts": {
+    "generate": "node generate-report.js",
+    "generate:demo": "node generate-report.js demo/test-results demo/playwright-report/report.json demo-report.html"
+  }
+}
