@@ -5,7 +5,7 @@ const path = require('path');
 
 const RESULTS_DIR = path.resolve(process.argv[2] || 'test-results');
 const JSON_REPORT = path.resolve(process.argv[3] || 'playwright-report/report.json');
-const OUTPUT = path.resolve(process.argv[4] || 'report.html');
+const OUTPUT = path.resolve(process.argv[4] || 'pwr-report/report.html');
 
 function fileToBase64DataUri(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -869,6 +869,7 @@ function main() {
   }
 
   const html = generateHTML(tests, RESULTS_DIR);
+  fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
   fs.writeFileSync(OUTPUT, html, 'utf-8');
 
   const sizeMB = (fs.statSync(OUTPUT).size / 1024 / 1024).toFixed(1);

@@ -46,7 +46,7 @@ export default defineConfig({
 
 ```sh
 npx playwright test
-ls report.html   # 测试结束后应存在
+ls pwr-report/report.html   # 测试结束后应存在
 ```
 
 ## 默认路径
@@ -55,7 +55,7 @@ ls report.html   # 测试结束后应存在
 |------|----------|
 | 测试结果目录 | `test-results/` |
 | JSON 报告 | `playwright-report/report.json` |
-| 输出 HTML | `report.html` |
+| 输出 HTML | `pwr-report/report.html` |
 
 自定义路径：
 
