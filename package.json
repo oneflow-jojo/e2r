@@ -1,5 +1,5 @@
 {
-  "name": "pwr",
+  "name": "e2r",
   "version": "1.0.0",
   "description": "Generate self-contained HTML reports from Playwright test results",
   "scripts": {

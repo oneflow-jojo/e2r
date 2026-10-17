@@ -5,7 +5,7 @@ const path = require('path');
 
 const RESULTS_DIR = path.resolve(process.argv[2] || 'test-results');
 const JSON_REPORT = path.resolve(process.argv[3] || 'playwright-report/report.json');
-const OUTPUT = path.resolve(process.argv[4] || 'pwr-report/report.html');
+const OUTPUT = path.resolve(process.argv[4] || 'e2r-report/report.html');
 
 function fileToBase64DataUri(filePath) {
   const ext = path.extname(filePath).toLowerCase();
