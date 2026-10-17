@@ -46,7 +46,16 @@ function loadReport(jsonPath) {
   return JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
 }
 
-function extractTests(report) {
+// Detect report format: 'playwright' or 'e2e'
+function detectFormat(report) {
+  if (!report) return 'playwright';
+  if (report.schemaVersion && report.run) return 'e2e';
+  if (report.suites) return 'playwright';
+  return 'playwright';
+}
+
+// Extract tests from Playwright JSON report
+function extractPlaywrightTests(report) {
   if (!report || !report.suites) return [];
   const tests = [];
   function walkSuites(suites, suitePath = []) {
@@ -76,6 +85,84 @@ function extractTests(report) {
   return tests;
 }
 
+// Extract tests from e2e (tester-army) JSON report
+function extractE2ETests(report, baseDir) {
+  if (!report || !report.run || !report.run.results) return [];
+  const results = report.run.results;
+  const summary = report.run.summary || {};
+  const tests = [];
+
+  for (const result of results) {
+    const titlePath = result.titlePath || [];
+    const title = titlePath[titlePath.length - 1] || result.testId || '(unnamed)';
+    // Use filename as suite for grouping
+    const fileName = result.file ? path.basename(result.file, path.extname(result.file)) : '';
+    const suite = fileName || '';
+
+    const attempts = result.attempts || [];
+    const lastAttempt = attempts[attempts.length - 1];
+    const status = result.status || 'unknown';
+    const durationMs = lastAttempt?.durationMs || 0;
+    const retryCount = Math.max(0, attempts.length - 1);
+
+    // Collect artifacts from all attempts
+    const screenshotPaths = [];
+    const videoPaths = [];
+    let errorMessage = null;
+
+    for (const attempt of attempts) {
+      // Error from attempt
+      if (attempt.error && !errorMessage) {
+        errorMessage = attempt.error.message || null;
+      }
+      // Also check failure.error
+      if (attempt.failure?.error && !errorMessage) {
+        errorMessage = attempt.failure.error.message || null;
+      }
+
+      // Artifacts
+      const artifacts = attempt.artifacts || [];
+      for (const artifact of artifacts) {
+        if (artifact.kind === 'screenshot' && artifact.path) {
+          screenshotPaths.push(path.join(baseDir, artifact.path));
+        } else if (artifact.kind === 'video' && artifact.path) {
+          videoPaths.push(path.join(baseDir, artifact.path));
+        }
+      }
+    }
+
+    // For skipped tests, get skip reason
+    if (status === 'skipped' && result.skip) {
+      errorMessage = result.skip.reason || 'Skipped';
+    }
+
+    tests.push({
+      title,
+      suite,
+      status,
+      duration: durationMs,
+      error: errorMessage,
+      retryCount,
+      tags: result.tags || [],
+      kind: result.kind || 'test',
+      targetId: result.targetId || null,
+      file: result.file || null,
+      _screenshotPaths: screenshotPaths,
+      _videoPaths: videoPaths,
+    });
+  }
+
+  return tests;
+}
+
+function extractTests(report, baseDir) {
+  const format = detectFormat(report);
+  if (format === 'e2e') {
+    return extractE2ETests(report, baseDir);
+  }
+  return extractPlaywrightTests(report);
+}
+
 function buildSuiteTree(tests) {
   const root = { name: 'Root', path: '', tests: [], children: [] };
   for (const test of tests) {
@@ -100,8 +187,9 @@ function generateHTML(tests, resultsDir) {
   const passed = tests.filter(t => t.status === 'passed');
   const failed = tests.filter(t => t.status === 'failed' || t.status === 'timedOut');
 
+  // Build media map from resultsDir (Playwright-style)
   const mediaByTest = {};
-  if (fs.existsSync(resultsDir)) {
+  if (resultsDir && fs.existsSync(resultsDir)) {
     for (const entry of fs.readdirSync(resultsDir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         const { screenshots, videos } = findMediaFiles(path.join(resultsDir, entry.name));
@@ -111,25 +199,38 @@ function generateHTML(tests, resultsDir) {
   }
 
   const testDetails = tests.map((test, idx) => {
-    const testDirName = Object.keys(mediaByTest).find(key => {
-      const normalized = key.replace(/-/g, ' ').toLowerCase();
-      const title = test.title.replace(/-/g, ' ').toLowerCase();
-      const titleWords = title.split(/\s+/).filter(w => w.length > 3);
-      const matchesWord = titleWords.some(word => normalized.includes(word));
-      return matchesWord || normalized.includes(title) || title.includes(normalized.split('/').pop());
-    });
-    const media = testDirName ? mediaByTest[testDirName] : { screenshots: [], videos: [] };
+    let screenshotDataUris = [];
+    let videoDataUris = [];
 
-    const screenshotDataUris = media.screenshots.map(f => ({
-      name: path.basename(f),
-      uri: fileToBase64DataUri(f),
-    }));
-    const videoDataUris = media.videos.map(f => ({
-      name: path.basename(f),
-      uri: fileToBase64DataUri(f),
-    }));
+    // If pre-resolved paths exist (e2e format), use them directly
+    if (test._screenshotPaths && test._screenshotPaths.length > 0) {
+      screenshotDataUris = test._screenshotPaths
+        .filter(f => fs.existsSync(f))
+        .map(f => ({ name: path.basename(f), uri: fileToBase64DataUri(f) }));
+    }
+    if (test._videoPaths && test._videoPaths.length > 0) {
+      videoDataUris = test._videoPaths
+        .filter(f => fs.existsSync(f))
+        .map(f => ({ name: path.basename(f), uri: fileToBase64DataUri(f) }));
+    }
 
-    return { ...test, id: idx, screenshotDataUris, videoDataUris };
+    // Fallback: try fuzzy matching from resultsDir (Playwright format)
+    if (screenshotDataUris.length === 0 && videoDataUris.length === 0 && resultsDir) {
+      const testDirName = Object.keys(mediaByTest).find(key => {
+        const normalized = key.replace(/-/g, ' ').toLowerCase();
+        const title = test.title.replace(/-/g, ' ').toLowerCase();
+        const titleWords = title.split(/\s+/).filter(w => w.length > 3);
+        const matchesWord = titleWords.some(word => normalized.includes(word));
+        return matchesWord || normalized.includes(title) || title.includes(normalized.split('/').pop());
+      });
+      const media = testDirName ? mediaByTest[testDirName] : { screenshots: [], videos: [] };
+      screenshotDataUris = media.screenshots.map(f => ({ name: path.basename(f), uri: fileToBase64DataUri(f) }));
+      videoDataUris = media.videos.map(f => ({ name: path.basename(f), uri: fileToBase64DataUri(f) }));
+    }
+
+    // Strip internal fields
+    const { _screenshotPaths, _videoPaths, ...clean } = test;
+    return { ...clean, id: idx, screenshotDataUris, videoDataUris };
   });
 
   const suiteTree = buildSuiteTree(testDetails);
@@ -317,6 +418,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .status-badge.skipped { background: var(--amber-soft); color: var(--amber); }
 .status-badge.other { background: #2b2b31; color: #b0b0ba; }
 .status-badge.flaky { background: var(--amber-soft); color: var(--amber); }
+
+.setup-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 6px; border-radius: 4px;
+  background: #1e2a3a; color: #7eb8da;
+  font-size: 9px; font-weight: 600; white-space: nowrap;
+}
+.tag-list { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.tag-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 6px; border-radius: 4px;
+  background: #2a2a30; color: #9898a0;
+  font-size: 9px; white-space: nowrap;
+}
 
 .test-item {
   border: 1px solid #303035; border-radius: 9px;
@@ -708,7 +823,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
           html += '<div class="test-item' + (isFlaky(t) ? ' flaky' : '') + (isOpen ? ' open' : '') + '" data-status="' + t.status + '" data-test-id="' + t.id + '">';
           html += '<div class="test-header">';
           html += '<span class="status-badge ' + sc + '">' + sl + '</span>';
+          if (t.kind === 'setup') html += '<span class="setup-badge">setup</span>';
           html += '<div class="test-title">' + escapeHtml(t.title) + '</div>';
+          if (t.tags && t.tags.length > 0) {
+            html += '<span class="tag-list">';
+            for (const tag of t.tags) html += '<span class="tag-badge">' + escapeHtml(tag) + '</span>';
+            html += '</span>';
+          }
           html += '<div class="test-suite">' + escapeHtml(t.suite) + '</div>';
           html += '<div class="test-duration">' + formatDuration(t.duration) + '</div>';
           html += '</div>';
@@ -838,10 +959,16 @@ function main() {
   console.log();
 
   const report = loadReport(JSON_REPORT);
+  const format = detectFormat(report);
+  console.log(`  Format: ${format}`);
+
   let tests = [];
 
   if (report) {
-    tests = extractTests(report);
+    // For e2e format, artifact paths are relative to <report-dir>/results/
+    const reportDir = path.dirname(JSON_REPORT);
+    const baseDir = format === 'e2e' ? path.join(reportDir, 'results') : RESULTS_DIR;
+    tests = extractTests(report, baseDir);
     console.log(`  Found ${tests.length} tests in JSON report`);
   } else {
     console.log('  No JSON report found, scanning test-results directory...');
@@ -868,7 +995,7 @@ function main() {
     process.exit(1);
   }
 
-  const html = generateHTML(tests, RESULTS_DIR);
+  const html = generateHTML(tests, format === 'e2e' ? null : RESULTS_DIR);
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
   fs.writeFileSync(OUTPUT, html, 'utf-8');
 
