@@ -1,2 +1,9 @@
-e2r-report/
+# Generated reports
+/e2r-report/
+.e2r-tmp-*/
+/demo-report.html
+/demo-report-real.html
+/dev/
+
+# Node
 node_modules/

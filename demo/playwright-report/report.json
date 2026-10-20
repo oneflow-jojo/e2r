@@ -7,7 +7,9 @@
     "expected": 0,
     "unexpected": 1,
     "flaky": 1,
-    "ok": true
+    "ok": true,
+    "startTime": "2026-10-16T10:00:00.000Z",
+    "duration": 25000
   },
   "suites": [
     {
@@ -22,11 +24,29 @@
                 {
                   "status": "passed",
                   "duration": 3200,
-                  "startTime": "2026-10-16T10:00:00.000Z"
+                  "startTime": "2026-10-16T10:00:00.000Z",
+                  "retry": 0,
+                  "attachments": [
+                    {
+                      "name": "screenshot.png",
+                      "contentType": "image/png",
+                      "path": "demo/test-results/login-flow-chromium/screenshot.png"
+                    },
+                    {
+                      "name": "video.webm",
+                      "contentType": "video/webm",
+                      "path": "demo/test-results/login-flow-chromium/video.webm"
+                    }
+                  ]
                 }
-              ]
+              ],
+              "projectName": "chromium",
+              "expectedStatus": "passed"
             }
-          ]
+          ],
+          "file": "demo/tests/example.spec.ts",
+          "line": 1,
+          "id": "demo-0"
         },
         {
           "title": "contact form submits successfully",
@@ -40,11 +60,24 @@
                   "startTime": "2026-10-16T10:00:05.000Z",
                   "error": {
                     "message": "Error: Timed out 5000ms waiting for expect(locator).toBeVisible()\n\nLocator: getByTestId(\"success-toast\")\nExpected: visible\nReceived: <element not found>"
-                  }
+                  },
+                  "retry": 0,
+                  "attachments": [
+                    {
+                      "name": "screenshot.png",
+                      "contentType": "image/png",
+                      "path": "demo/test-results/contact-form-submit-chromium/screenshot.png"
+                    }
+                  ]
                 }
-              ]
+              ],
+              "projectName": "chromium",
+              "expectedStatus": "passed"
             }
-          ]
+          ],
+          "file": "demo/tests/example.spec.ts",
+          "line": 6,
+          "id": "demo-1"
         },
         {
           "title": "member upgrades to Pro plan",
@@ -58,19 +91,47 @@
                   "startTime": "2026-10-16T10:00:15.000Z",
                   "error": {
                     "message": "Element not clickable"
-                  }
+                  },
+                  "retry": 0,
+                  "attachments": []
                 },
                 {
                   "status": "passed",
                   "duration": 4100,
-                  "startTime": "2026-10-16T10:00:20.000Z"
+                  "startTime": "2026-10-16T10:00:20.000Z",
+                  "retry": 1,
+                  "attachments": [
+                    {
+                      "name": "screenshot-1.png",
+                      "contentType": "image/png",
+                      "path": "demo/test-results/upgrade-to-pro-chromium/screenshot-1.png"
+                    },
+                    {
+                      "name": "screenshot-2.png",
+                      "contentType": "image/png",
+                      "path": "demo/test-results/upgrade-to-pro-chromium/screenshot-2.png"
+                    },
+                    {
+                      "name": "video.webm",
+                      "contentType": "video/webm",
+                      "path": "demo/test-results/upgrade-to-pro-chromium/video.webm"
+                    }
+                  ]
                 }
-              ]
+              ],
+              "projectName": "chromium",
+              "expectedStatus": "passed"
             }
-          ]
+          ],
+          "file": "demo/tests/example.spec.ts",
+          "line": 11,
+          "id": "demo-2"
         }
       ],
       "suites": []
     }
-  ]
+  ],
+  "config": {
+    "rootDir": "."
+  }
 }

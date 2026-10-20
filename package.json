@@ -1,9 +1,16 @@
 {
   "name": "e2r",
   "version": "1.0.0",
-  "description": "Generate self-contained HTML reports from Playwright test results",
+  "description": "Browse E2E test catalogs and execution evidence in portable HTML reports",
+  "private": true,
   "scripts": {
-    "generate": "node generate-report.js",
-    "generate:demo": "node generate-report.js demo/test-results demo/playwright-report/report.json demo-report.html"
+    "generate": "node scripts/generate-report.js",
+    "generate:demo": "node scripts/generate-report.js demo/test-results demo/playwright-report/report.json e2r-report/report.html",
+    "test": "node --test test/*.test.cjs"
+  },
+  "devDependencies": {
+    "@e2e-dev/web": "0.15.1",
+    "@playwright/test": "1.59.1",
+    "e2e": "0.21.1"
   }
 }
