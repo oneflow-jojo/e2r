@@ -6,7 +6,7 @@
     timedOut: '超时', interrupted: '中断', notRun: model.catalogOnly ? '尚未执行' : '本次未执行', unknown: '未知' };
   const esc = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   const when = value => value ? new Date(value).toLocaleString('zh-CN') : '未提供';
-  const state = { search: '', status: 'all', file: '', open: new Set(), attempts: new Map(), tabs: new Map() };
+  const state = { search: '', status: 'all', category: '', open: new Set(), attempts: new Map(), tabs: new Map() };
   const list = $('#test-list');
   const info = [`${model.catalogComplete ? '完整目录' : '导入的执行结果 · 目录未完整刷新'}：${tests.length} 个测试项`,
     `目录快照：${when(model.generatedAt)}`];
@@ -21,14 +21,16 @@
   function statusLabel(t) { return (labels[t.status] || t.status) + (t.status === 'passed' && t.expectedStatus === 'failed' ? '（符合预期失败）' : ''); }
   function visible() {
     const q = state.search.toLocaleLowerCase('zh-CN');
-    return tests.filter(t => (!state.file || t.file === state.file) && (state.status === 'all' || t.status === state.status)
-      && (!q || [t.titlePath.join(' '), t.file, environment(t), ...(t.tags || [])].join(' ').toLocaleLowerCase('zh-CN').includes(q)));
+    return tests.filter(t => (!state.category || t.category === state.category) && (state.status === 'all' || t.status === state.status)
+      && (!q || [t.titlePath.join(' '), t.file, t.category, environment(t), ...(t.tags || [])].join(' ').toLocaleLowerCase('zh-CN').includes(q)));
   }
   function pause(node) { node.querySelectorAll('video').forEach(v => v.pause()); }
   function renderNavigation() {
-    const files = [...new Set(tests.map(t => t.file))];
-    $('#suite-tree').innerHTML = `<button class="suite-node ${!state.file ? 'active' : ''}" data-file="">全部测试 <span>${tests.length}</span></button>`
-      + files.map(f => `<button class="suite-node ${state.file === f ? 'active' : ''}" data-file="${esc(f)}">${esc(f || '(未提供文件)')} <span>${tests.filter(t => t.file === f).length}</span></button>`).join('');
+    const categories = new Map();
+    for (const t of tests) categories.set(t.category || '其他', (categories.get(t.category || '其他') || 0) + 1);
+    const ordered = [...categories].sort(([a], [b]) => a.localeCompare(b, 'zh-CN'));
+    $('#suite-tree').innerHTML = `<button class="suite-node ${!state.category ? 'active' : ''}" data-category="">全部测试 <span>${tests.length}</span></button>`
+      + ordered.map(([name, count]) => `<button class="suite-node ${state.category === name ? 'active' : ''}" data-category="${esc(name)}">${esc(name)} <span>${count}</span></button>`).join('');
   }
   function mediaPanel(items, type) {
     const media = items.filter(m => m.type === type);
@@ -45,28 +47,54 @@
   }
   function body(t) {
     const a = current(t);
-    if (!a) return `<p class="no-media">${esc(labels[t.status] || t.status)}${t.declaredSkip ? ' · 测试声明为跳过' : ''}${t.reason ? '：' + esc(t.reason) : ''}。没有本次执行的截图或录屏。</p>`;
+    const source = `<div class="source-details">源码位置：${esc(location(t) || '未提供')}</div>`;
+    if (!a) return `${source}<p class="no-media">${esc(labels[t.status] || t.status)}${t.declaredSkip ? ' · 测试声明为跳过' : ''}${t.reason ? '：' + esc(t.reason) : ''}。没有本次执行的截图或录屏。</p>`;
     const selected = state.attempts.get(t.id) ?? t.attempts.length - 1;
     const tabKey = t.id + ':' + selected;
     const type = state.tabs.get(tabKey) || (a.media.some(m => m.type === 'video') ? 'video' : 'screenshot');
     const types = ['video', 'screenshot'].filter(k => a.media.some(m => m.type === k));
-    return `<div class="attempt-control"><label>查看尝试 <select data-attempt class="filter-select">${t.attempts.map((attempt, i) => `<option value="${i}" ${i === selected ? 'selected' : ''}>第 ${attempt.index ?? i + 1} 次 · ${esc(labels[attempt.status] || attempt.status)}</option>`).join('')}</select></label>
+    return `${source}<div class="attempt-control"><label>查看尝试 <select data-attempt class="filter-select">${t.attempts.map((attempt, i) => `<option value="${i}" ${i === selected ? 'selected' : ''}>第 ${attempt.index ?? i + 1} 次 · ${esc(labels[attempt.status] || attempt.status)}</option>`).join('')}</select></label>
       <span>${when(a.startedAt)} · ${(a.duration / 1000).toFixed(1)}s</span></div>
       ${types.length ? `<section class="evidence-section"><div class="evidence-tabs" role="tablist" aria-label="执行证据">${types.map(k => `<button class="evidence-tab" role="tab" aria-selected="${k === type}" data-tab="${k}">${k === 'video' ? '录屏' : '截图'} <span class="evidence-tab-count">${a.media.filter(m => m.type === k).length}</span></button>`).join('')}</div><div class="evidence-panel" role="tabpanel">${mediaPanel(a.media, type)}</div></section>` : '<p class="no-media">本次尝试未产生截图或录屏。</p>'}
       ${a.error ? `<details class="error-details"><summary>错误详情</summary><pre class="error-box">${esc(a.error)}</pre></details>` : ''}`;
   }
   function renderBody(item, t) { const target = item.querySelector('.test-body'); pause(target); target.innerHTML = body(t); }
+  function scenarioKey(t) { return JSON.stringify([t.framework, t.file, t.titlePath, t.kind || 'test']); }
+  function renderTestItem(t, variant = false) {
+    const media = t.attempts.flatMap(a => a.media);
+    const counts = ['video', 'screenshot'].map(type => `${type === 'video' ? '录屏' : '截图'} ${media.filter(m => m.type === type).length}`).join(' · ');
+    const missing = media.filter(m => m.availability === 'missing').length;
+    const cls = ['passed', 'failed', 'timedOut', 'skipped', 'flaky'].includes(t.status) ? t.status : 'other';
+    const title = variant ? (environment(t) || '默认环境') : t.titlePath.join(' › ');
+    const meta = variant ? '执行环境' : [environment(t), t.kind === 'setup' ? '准备测试' : ''].filter(Boolean).join(' · ');
+    return `<article class="test-item ${state.open.has(t.id) ? 'open' : ''} ${variant ? 'test-variant' : ''}" data-id="${t.id}" data-status="${t.status}"><div class="test-header">
+      <span class="status-badge ${cls}">${esc(statusLabel(t))}</span><button class="test-toggle" aria-expanded="${state.open.has(t.id)}"><div class="test-title">${esc(title)}</div>${meta ? `<div class="test-meta">${esc(meta)}</div>` : ''}<div class="test-media-count">${counts}${missing ? ' · ' + missing + ' 个文件不可用' : ''}</div></button>
+      <button class="soft-button" data-copy>复制给 AI</button></div><div class="test-body"></div></article>`;
+  }
+  function renderScenario(group) {
+    if (group.length === 1) return renderTestItem(group[0]);
+    const counts = new Map();
+    for (const t of group) counts.set(t.status, (counts.get(t.status) || 0) + 1);
+    const summary = [...counts].map(([status, count]) => `${esc(labels[status] || status)} ${count}`).join(' · ');
+    return `<section class="scenario-group"><header class="scenario-heading"><div class="scenario-title">${esc(group[0].titlePath.join(' › '))}</div><div class="scenario-summary">${group.length} 个执行变体 · ${summary}</div></header><div class="variant-list">${group.map(t => renderTestItem(t, true)).join('')}</div></section>`;
+  }
   function renderList() {
     pause(list);
     const rows = visible();
-    list.innerHTML = rows.map(t => {
-      const media = t.attempts.flatMap(a => a.media);
-      const counts = ['video', 'screenshot'].map(type => `${type === 'video' ? '录屏' : '截图'} ${media.filter(m => m.type === type).length}`).join(' · ');
-      const missing = media.filter(m => m.availability === 'missing').length;
-      const cls = ['passed', 'failed', 'timedOut', 'skipped', 'flaky'].includes(t.status) ? t.status : 'other';
-      return `<article class="test-item ${state.open.has(t.id) ? 'open' : ''}" data-id="${t.id}" data-status="${t.status}"><div class="test-header">
-      <span class="status-badge ${cls}">${esc(statusLabel(t))}</span><button class="test-toggle" aria-expanded="${state.open.has(t.id)}"><div class="test-title">${esc(t.titlePath.join(' › '))}</div><div class="test-meta">${esc(location(t))}${environment(t) ? ' · ' + esc(environment(t)) : ''}${t.kind === 'setup' ? ' · 准备测试' : ''}</div><div class="test-media-count">${counts}${missing ? ' · ' + missing + ' 个文件不可用' : ''}</div></button>
-      <button class="soft-button" data-copy>复制给 AI</button></div><div class="test-body"></div></article>`;
+    const byCategory = new Map();
+    for (const t of rows) {
+      const name = t.category || '其他';
+      if (!byCategory.has(name)) byCategory.set(name, []);
+      byCategory.get(name).push(t);
+    }
+    list.innerHTML = [...byCategory].sort(([a], [b]) => a.localeCompare(b, 'zh-CN')).map(([name, items]) => {
+      const scenarios = new Map();
+      for (const t of items) {
+        const key = scenarioKey(t);
+        if (!scenarios.has(key)) scenarios.set(key, []);
+        scenarios.get(key).push(t);
+      }
+      return `<section class="feature-group"><header class="feature-heading"><span>${esc(name)}</span><span class="group-count">${items.length} 个测试项</span></header>${[...scenarios.values()].map(renderScenario).join('')}</section>`;
     }).join('') || `<p class="empty">${tests.length ? '没有匹配的测试' : '未发现测试'}</p>`;
     for (const item of list.querySelectorAll('.test-item.open')) renderBody(item, tests.find(t => t.id === item.dataset.id));
     $('#visible-count').textContent = `显示 ${rows.length} / ${tests.length} 个测试项`;
@@ -126,8 +154,8 @@
     }
   });
   $('#suite-tree').addEventListener('click', e => {
-    const button = e.target.closest('[data-file]'); if (!button) return;
-    state.file = button.dataset.file; renderNavigation(); renderList();
+    const button = e.target.closest('[data-category]'); if (!button) return;
+    state.category = button.dataset.category; renderNavigation(); renderList();
   });
   $('#search').addEventListener('input', e => { state.search = e.target.value; renderList(); });
   $('#status-filter').addEventListener('change', e => { state.status = e.target.value; renderList(); });

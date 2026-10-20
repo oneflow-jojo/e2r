@@ -275,19 +275,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .no-media { margin-top: 12px; color: var(--muted); font-size: 11px; font-style: italic; }
 
-.suite-group { margin-bottom: 16px; }
-.suite-group-header {
+.feature-group { margin-bottom: 22px; }
+.feature-heading {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 0; cursor: pointer;
-  color: var(--muted); font-size: 11px; font-weight: 600;
+  padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 10px;
+  color: #d8d8dc; font-size: 13px; font-weight: 650;
 }
-.suite-group-header:hover { color: var(--ink); }
-.suite-group-header .arrow {
-  display: inline-block; transition: transform .15s;
-  font-size: 10px; width: 14px; text-align: center;
-}
-.suite-group-header.collapsed .arrow { transform: rotate(-90deg); }
-.suite-group-header .group-count { color: #77777f; font-size: 10px; font-weight: 400; }
+.feature-heading .group-count { margin-left: auto; color: #77777f; font-size: 10px; font-weight: 400; }
+.scenario-group { margin-bottom: 9px; border: 1px solid #303035; border-radius: 9px; background: #121214; overflow: hidden; }
+.scenario-heading { padding: 10px 13px 8px; }
+.scenario-title { color: #d9d9dd; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.scenario-summary { margin-top: 5px; color: var(--muted); font-size: 10px; }
+.variant-list { padding: 0 10px 7px; }
+.variant-list .test-item { margin: 0; border: 0; border-top: 1px solid #29292d; border-radius: 0; background: transparent; }
+.variant-list .test-item:hover { border-color: #45454b; }
+.variant-list .test-header { padding: 9px 4px; }
+.test-variant .test-title { font-size: 12px; }
+.source-details { margin-top: 12px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 
 .modal {
   max-width: min(92vw, 1100px); max-height: 92vh;

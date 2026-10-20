@@ -13,7 +13,7 @@ function renderReport(model) {
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>E2E Test Report</title><style>${css}</style></head>
 <body><header class="topbar"><div class="brand"><div class="brand-title">E2E Test Report</div><div class="brand-sub">测试目录与执行证据</div></div><div class="top-spacer"></div><span class="duration-pill">${escape(model.framework)}</span></header>
-<main class="workspace"><aside class="sidebar" aria-label="文件导航"><p class="section-label">测试文件</p><nav id="suite-tree"></nav></aside>
+<main class="workspace"><aside class="sidebar" aria-label="功能导航"><p class="section-label">按功能查找</p><nav id="suite-tree"></nav></aside>
 <section class="main"><div class="page-shell"><div class="run-info" id="run-info"></div>
 ${model.warnings.map(w => `<div class="notice" role="status">${escape(w)}</div>`).join('')}
 ${(model.run?.errors || []).map(e => `<div class="notice" role="alert">运行级错误：${escape(e)}</div>`).join('')}

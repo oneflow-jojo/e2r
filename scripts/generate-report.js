@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { discover } = require('./discover.js');
 const { normalizeE2E, normalizePlaywrightJSON, mergeCatalog } = require('./model.js');
+const { categorizeTests, readCategoryConfig } = require('./categories.js');
 const { prepareMedia, publish } = require('./media.js');
 const { renderReport } = require('./render-report.js');
 
@@ -30,7 +31,9 @@ async function generateReport(options) {
     if (options.signal?.aborted || options.catalogOnly) throw error;
     warnings.push(`目录未完整刷新，仅展示本次导入的执行结果。原因：${error.message}`);
   }
-  const tests = mergeCatalog(catalog, normalized.tests);
+  const categoryConfig = await readCategoryConfig(projectRoot);
+  if (categoryConfig.warning) warnings.push(categoryConfig.warning);
+  const tests = categorizeTests(mergeCatalog(catalog, normalized.tests), categoryConfig.rules);
   const model = { framework, tests, run: normalized.run, generatedAt: new Date().toISOString(),
     catalogOnly: !!options.catalogOnly, catalogComplete, warnings };
   await fs.mkdir(path.dirname(output), { recursive: true });
