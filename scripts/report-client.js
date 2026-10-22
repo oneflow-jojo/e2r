@@ -6,7 +6,7 @@
     timedOut: '超时', interrupted: '中断', notRun: model.catalogOnly ? '尚未执行' : '本次未执行', unknown: '未知' };
   const esc = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
   const when = value => value ? new Date(value).toLocaleString('zh-CN') : '未提供';
-  const state = { search: '', status: 'all', category: '', open: new Set(), attempts: new Map(), tabs: new Map() };
+  const state = { search: '', status: 'all', categoryPath: [], collapsedCategories: new Set(), open: new Set(), attempts: new Map(), tabs: new Map() };
   const list = $('#test-list');
   const info = [`${model.catalogComplete ? '完整目录' : '导入的执行结果 · 目录未完整刷新'}：${tests.length} 个测试项`,
     `目录快照：${when(model.generatedAt)}`];
@@ -16,21 +16,43 @@
   function environment(t) {
     return [t.target, t.agent, t.repeat ? '重复执行 ' + (t.repeat + 1) : ''].filter(Boolean).join(' · ');
   }
+  function categoryPath(t) { return Array.isArray(t.categoryPath) && t.categoryPath.length ? t.categoryPath : [t.category || '其他']; }
   function location(t) { return t.file + (t.source?.line ? ':' + t.source.line : ''); }
   function current(t) { return t.attempts[state.attempts.get(t.id) ?? t.attempts.length - 1]; }
   function statusLabel(t) { return (labels[t.status] || t.status) + (t.status === 'passed' && t.expectedStatus === 'failed' ? '（符合预期失败）' : ''); }
   function visible() {
     const q = state.search.toLocaleLowerCase('zh-CN');
-    return tests.filter(t => (!state.category || t.category === state.category) && (state.status === 'all' || t.status === state.status)
-      && (!q || [t.titlePath.join(' '), t.file, t.category, environment(t), ...(t.tags || [])].join(' ').toLocaleLowerCase('zh-CN').includes(q)));
+    return tests.filter(t => {
+      const path = categoryPath(t);
+      const categoryMatches = state.categoryPath.every((segment, index) => path[index] === segment);
+      return categoryMatches && (state.status === 'all' || t.status === state.status)
+        && (!q || [t.titlePath.join(' '), t.file, path.join(' '), t.category, environment(t), ...(t.tags || [])].join(' ').toLocaleLowerCase('zh-CN').includes(q));
+    });
   }
   function pause(node) { node.querySelectorAll('video').forEach(v => v.pause()); }
   function renderNavigation() {
-    const categories = new Map();
-    for (const t of tests) categories.set(t.category || '其他', (categories.get(t.category || '其他') || 0) + 1);
-    const ordered = [...categories].sort(([a], [b]) => a.localeCompare(b, 'zh-CN'));
-    $('#suite-tree').innerHTML = `<button class="suite-node ${!state.category ? 'active' : ''}" data-category="">全部测试 <span>${tests.length}</span></button>`
-      + ordered.map(([name, count]) => `<button class="suite-node ${state.category === name ? 'active' : ''}" data-category="${esc(name)}">${esc(name)} <span>${count}</span></button>`).join('');
+    const roots = new Map();
+    for (const t of tests) {
+      let children = roots;
+      const path = categoryPath(t);
+      for (let index = 0; index < path.length; index++) {
+        const name = path[index];
+        if (!children.has(name)) children.set(name, { name, path: path.slice(0, index + 1), count: 0, children: new Map() });
+        const node = children.get(name);
+        node.count++;
+        children = node.children;
+      }
+    }
+    const renderNodes = nodes => [...nodes.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')).map(node => {
+      const key = JSON.stringify(node.path);
+      const selected = state.categoryPath.length === node.path.length && node.path.every((part, index) => state.categoryPath[index] === part);
+      const hasChildren = node.children.size > 0;
+      const collapsed = state.collapsedCategories.has(key);
+      return `<div class="suite-entry"><div class="suite-row"><button class="suite-node ${selected ? 'active' : ''}" data-category="${esc(node.path.join(' / '))}" data-category-key="${esc(key)}"><span class="suite-label">${esc(node.name)}</span><span class="suite-count">${node.count}</span></button>${hasChildren
+        ? `<button class="suite-toggle" data-category-toggle="${esc(key)}" aria-label="${collapsed ? '展开' : '收起'}${esc(node.name)}" aria-expanded="${!collapsed}">${collapsed ? '▸' : '▾'}</button>`
+        : '<span class="suite-toggle-spacer" aria-hidden="true"></span>'}</div>${hasChildren && !collapsed ? `<div class="suite-children">${renderNodes(node.children)}</div>` : ''}</div>`;
+    }).join('');
+    $('#suite-tree').innerHTML = `<button class="suite-node ${!state.categoryPath.length ? 'active' : ''}" data-category="" data-category-key="[]"><span class="suite-label">全部测试</span><span class="suite-count">${tests.length}</span></button>${renderNodes(roots)}`;
   }
   function mediaPanel(items, type) {
     const media = items.filter(m => m.type === type);
@@ -83,18 +105,19 @@
     const rows = visible();
     const byCategory = new Map();
     for (const t of rows) {
-      const name = t.category || '其他';
-      if (!byCategory.has(name)) byCategory.set(name, []);
-      byCategory.get(name).push(t);
+      const path = categoryPath(t);
+      const key = JSON.stringify(path);
+      if (!byCategory.has(key)) byCategory.set(key, { path, items: [] });
+      byCategory.get(key).items.push(t);
     }
-    list.innerHTML = [...byCategory].sort(([a], [b]) => a.localeCompare(b, 'zh-CN')).map(([name, items]) => {
+    list.innerHTML = [...byCategory.values()].sort((a, b) => a.path.join(' / ').localeCompare(b.path.join(' / '), 'zh-CN')).map(({ path, items }) => {
       const scenarios = new Map();
       for (const t of items) {
         const key = scenarioKey(t);
         if (!scenarios.has(key)) scenarios.set(key, []);
         scenarios.get(key).push(t);
       }
-      return `<section class="feature-group"><header class="feature-heading"><span>${esc(name)}</span><span class="group-count">${items.length} 个测试项</span></header>${[...scenarios.values()].map(renderScenario).join('')}</section>`;
+      return `<section class="feature-group"><header class="feature-heading"><span>${esc(path.join(' / '))}</span><span class="group-count">${items.length} 个测试项</span></header>${[...scenarios.values()].map(renderScenario).join('')}</section>`;
     }).join('') || `<p class="empty">${tests.length ? '没有匹配的测试' : '未发现测试'}</p>`;
     for (const item of list.querySelectorAll('.test-item.open')) renderBody(item, tests.find(t => t.id === item.dataset.id));
     $('#visible-count').textContent = `显示 ${rows.length} / ${tests.length} 个测试项`;
@@ -154,8 +177,14 @@
     }
   });
   $('#suite-tree').addEventListener('click', e => {
-    const button = e.target.closest('[data-category]'); if (!button) return;
-    state.category = button.dataset.category; renderNavigation(); renderList();
+    const toggle = e.target.closest('[data-category-toggle]');
+    if (toggle) {
+      const key = toggle.dataset.categoryToggle;
+      if (state.collapsedCategories.has(key)) state.collapsedCategories.delete(key); else state.collapsedCategories.add(key);
+      renderNavigation(); return;
+    }
+    const button = e.target.closest('[data-category-key]'); if (!button) return;
+    state.categoryPath = JSON.parse(button.dataset.categoryKey); renderNavigation(); renderList();
   });
   $('#search').addEventListener('input', e => { state.search = e.target.value; renderList(); });
   $('#status-filter').addEventListener('change', e => { state.status = e.target.value; renderList(); });

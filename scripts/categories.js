@@ -29,9 +29,12 @@ function validateConfig(config) {
   }
   return config.categories.map((category, index) => {
     if (!category || typeof category !== 'object' || Array.isArray(category)
-      || typeof category.name !== 'string' || !category.name.trim()
+      || (category.name != null && (typeof category.name !== 'string' || !category.name.trim()))
+      || (category.path != null && (!Array.isArray(category.path) || !category.path.length
+        || category.path.some(segment => typeof segment !== 'string' || !segment.trim())))
+      || (!category.name && !category.path)
       || !category.match || typeof category.match !== 'object' || Array.isArray(category.match)) {
-      throw new Error(`第 ${index + 1} 个分类需要 name 和 match。`);
+      throw new Error(`第 ${index + 1} 个分类需要 name 或 path，以及 match。`);
     }
     const match = {};
     for (const key of ['files', 'suites', 'tags']) {
@@ -43,7 +46,8 @@ function validateConfig(config) {
       match[key] = category.match[key];
     }
     if (!Object.keys(match).length) throw new Error(`第 ${index + 1} 个分类至少需要一个 files、suites 或 tags 规则。`);
-    return { name: category.name.trim(), match,
+    const categoryPath = (category.path || [category.name]).map(segment => segment.trim());
+    return { name: categoryPath.at(-1), path: categoryPath, match,
       filePatterns: (match.files || []).map(globRegExp) };
   });
 }
@@ -122,11 +126,12 @@ function categorizeTests(tests, rules = []) {
   const categories = new Map();
   for (const [key, variants] of scenarios) {
     const configured = rules.find(rule => variants.some(test => configuredCategory(test, [rule])));
-    categories.set(key, configured?.name || inferredCategory(variants[0], tests) || '其他');
+    categories.set(key, configured?.path || [inferredCategory(variants[0], tests) || '其他']);
   }
   return tests.map(test => {
     const key = JSON.stringify([test.framework, test.file, test.titlePath, test.kind || 'test']);
-    return { ...test, category: categories.get(key) || '其他' };
+    const categoryPath = categories.get(key) || ['其他'];
+    return { ...test, category: categoryPath.join(' / '), categoryPath };
   });
 }
 

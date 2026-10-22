@@ -83,10 +83,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: transparent; color: #a6a6ad; text-align: left;
   font-size: 12px; cursor: pointer; transition: background .15s, color .15s;
 }
+.suite-row { display: flex; align-items: center; gap: 2px; }
+.suite-row .suite-node { flex: 1; width: auto; min-width: 0; }
+.suite-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suite-node:hover { background: #1c1c1f; color: #f0f0f1; }
 .suite-node.active { background: #242428; color: #fff; font-weight: 650; }
 .suite-count { color: #77777f; font-size: 10px; font-variant-numeric: tabular-nums; }
 .suite-node.active .suite-count { color: #bfc0c4; }
+.suite-entry { min-width: 0; }
 .suite-children {
   display: flex; flex-direction: column; gap: 2px;
   margin: 3px 0 6px 11px; padding-left: 7px;
@@ -98,6 +102,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   cursor: pointer; flex-shrink: 0; display: grid; place-items: center;
 }
 .suite-toggle:hover { background: #1c1c1f; color: #f0f0f1; }
+.suite-toggle-spacer { flex: 0 0 20px; }
 .sidebar-stats {
   margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line);
   color: #77777f; font-size: 10px; line-height: 1.7;
